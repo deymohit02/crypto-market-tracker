@@ -7,7 +7,11 @@ import { useTheme } from "@/hooks/useTheme";
 import { useCryptoSearch } from "@/hooks/useCryptoData";
 import { useDebounce } from "@/hooks/useDebounce";
 
-export default function Header() {
+interface HeaderProps {
+  onSearchSelect?: (cryptoId: string) => void;
+}
+
+export default function Header({ onSearchSelect }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -51,6 +55,9 @@ export default function Header() {
                       key={crypto.id}
                       className="flex items-center space-x-3 p-3 hover:bg-muted cursor-pointer"
                       onClick={() => {
+                        if (onSearchSelect) {
+                          onSearchSelect(crypto.id);
+                        }
                         setSearchQuery("");
                         setShowSearchResults(false);
                       }}

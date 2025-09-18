@@ -11,9 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 interface CryptocurrencyTableProps {
   cryptocurrencies: Cryptocurrency[];
   isLoading: boolean;
+  searchFilter?: string | null;
 }
 
-export default function CryptocurrencyTable({ cryptocurrencies, isLoading }: CryptocurrencyTableProps) {
+export default function CryptocurrencyTable({ cryptocurrencies, isLoading, searchFilter }: CryptocurrencyTableProps) {
   const [sortBy, setSortBy] = useState<keyof Cryptocurrency>('market_cap_rank');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,7 +32,12 @@ export default function CryptocurrencyTable({ cryptocurrencies, isLoading }: Cry
     }
   };
 
-  const sortedData = [...cryptocurrencies].sort((a, b) => {
+  // Filter data if search filter is applied
+  const filteredData = searchFilter 
+    ? cryptocurrencies.filter(crypto => crypto.id === searchFilter)
+    : cryptocurrencies;
+
+  const sortedData = [...filteredData].sort((a, b) => {
     const aVal = a[sortBy] || '';
     const bVal = b[sortBy] || '';
     
@@ -50,7 +56,7 @@ export default function CryptocurrencyTable({ cryptocurrencies, isLoading }: Cry
     currentPage * itemsPerPage
   );
 
-  const totalPages = Math.ceil(cryptocurrencies.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   const handleWatchlistToggle = (cryptoId: string) => {
     const isWatched = watchlist?.some(item => item.cryptoId === cryptoId);
@@ -225,7 +231,7 @@ export default function CryptocurrencyTable({ cryptocurrencies, isLoading }: Cry
       <div className="px-6 py-4 border-t border-border">
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, cryptocurrencies.length)} of {cryptocurrencies.length} cryptocurrencies
+            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} cryptocurrencies
           </div>
           <div className="flex items-center space-x-2">
             <Button

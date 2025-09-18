@@ -11,13 +11,14 @@ import { Plus } from "lucide-react";
 
 export default function Dashboard() {
   const [selectedCrypto, setSelectedCrypto] = useState("bitcoin");
+  const [searchFilter, setSearchFilter] = useState<string | null>(null);
   const { data: cryptocurrencies, isLoading } = useCryptoData();
   const { lastUpdate, isConnected } = useWebSocket();
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <Header />
+      <Header onSearchSelect={setSearchFilter} />
 
       <main className="container mx-auto px-4 py-6">
         {/* Market Overview */}
@@ -64,7 +65,7 @@ export default function Dashboard() {
             </div>
 
             {/* Detailed Price Table */}
-            <CryptocurrencyTable cryptocurrencies={cryptocurrencies || []} isLoading={isLoading} />
+            <CryptocurrencyTable cryptocurrencies={cryptocurrencies || []} isLoading={isLoading} searchFilter={searchFilter} />
           </div>
 
           {/* Sidebar */}
