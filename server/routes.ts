@@ -26,47 +26,51 @@ async function updateCryptocurrencyData() {
   try {
     const data = await fetchFromCoinGecko("/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d");
 
-    for (const coin of data) {
-      await storage.upsertCryptocurrency({
-        id: coin.id,
-        symbol: coin.symbol,
-        name: coin.name,
-        image: coin.image,
-        current_price: coin.current_price?.toString(),
-        market_cap: coin.market_cap?.toString(),
-        market_cap_rank: coin.market_cap_rank?.toString(),
-        fully_diluted_valuation: coin.fully_diluted_valuation?.toString(),
-        total_volume: coin.total_volume?.toString(),
-        high_24h: coin.high_24h?.toString(),
-        low_24h: coin.low_24h?.toString(),
-        price_change_24h: coin.price_change_24h?.toString(),
-        price_change_percentage_24h: coin.price_change_percentage_24h?.toString(),
-        price_change_percentage_7d: coin.price_change_percentage_7d_in_currency?.toString(),
-        market_cap_change_24h: coin.market_cap_change_24h?.toString(),
-        market_cap_change_percentage_24h: coin.market_cap_change_percentage_24h?.toString(),
-        circulating_supply: coin.circulating_supply?.toString(),
-        total_supply: coin.total_supply?.toString(),
-        max_supply: coin.max_supply?.toString(),
-        ath: coin.ath?.toString(),
-        ath_change_percentage: coin.ath_change_percentage?.toString(),
-        ath_date: coin.ath_date ? new Date(coin.ath_date) : null,
-        atl: coin.atl?.toString(),
-        atl_change_percentage: coin.atl_change_percentage?.toString(),
-        atl_date: coin.atl_date ? new Date(coin.atl_date) : null,
-      });
+    // Only update storage if we successfully fetched data
+    if (data && data.length > 0) {
+      for (const coin of data) {
+        await storage.upsertCryptocurrency({
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          image: coin.image,
+          current_price: coin.current_price?.toString(),
+          market_cap: coin.market_cap?.toString(),
+          market_cap_rank: coin.market_cap_rank?.toString(),
+          fully_diluted_valuation: coin.fully_diluted_valuation?.toString(),
+          total_volume: coin.total_volume?.toString(),
+          high_24h: coin.high_24h?.toString(),
+          low_24h: coin.low_24h?.toString(),
+          price_change_24h: coin.price_change_24h?.toString(),
+          price_change_percentage_24h: coin.price_change_percentage_24h?.toString(),
+          price_change_percentage_7d: coin.price_change_percentage_7d_in_currency?.toString(),
+          market_cap_change_24h: coin.market_cap_change_24h?.toString(),
+          market_cap_change_percentage_24h: coin.market_cap_change_percentage_24h?.toString(),
+          circulating_supply: coin.circulating_supply?.toString(),
+          total_supply: coin.total_supply?.toString(),
+          max_supply: coin.max_supply?.toString(),
+          ath: coin.ath?.toString(),
+          ath_change_percentage: coin.ath_change_percentage?.toString(),
+          ath_date: coin.ath_date ? new Date(coin.ath_date) : null,
+          atl: coin.atl?.toString(),
+          atl_change_percentage: coin.atl_change_percentage?.toString(),
+          atl_date: coin.atl_date ? new Date(coin.atl_date) : null,
+        });
 
-      // Add to price history
-      await storage.addPriceHistory({
-        cryptoId: coin.id,
-        price: coin.current_price?.toString()
-      });
+        // Add to price history
+        await storage.addPriceHistory({
+          cryptoId: coin.id,
+          price: coin.current_price?.toString()
+        });
+      }
+      console.log(`Successfully updated ${data.length} cryptocurrencies`);
     }
 
     return data;
   } catch (error) {
-    console.error('Error updating cryptocurrency data:', error);
-    // Return empty array instead of throwing to keep server alive
-    return [];
+    console.error('Error updating cryptocurrency data (will retry later):', error);
+    // Return null to signal failure without clearing existing data
+    return null;
   }
 }
 
@@ -144,17 +148,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('Fetching cryptocurrency data...');
       const data = await updateCryptocurrencyData();
-      await checkPriceAlerts(data);
 
-      // Broadcast updated data to connected clients
-      broadcast({
-        type: 'price_update',
-        data: data.slice(0, 20) // Send top 20 coins
-      });
+      // Only process if we got valid data
+      if (data && data.length > 0) {
+        await checkPriceAlerts(data);
 
-      if (!isInitialized) {
-        console.log('Cryptocurrency data initialized');
-        isInitialized = true;
+        // Broadcast updated data to connected clients
+        broadcast({
+          type: 'price_update',
+          data: data.slice(0, 20) // Send top 20 coins
+        });
+
+        if (!isInitialized) {
+          console.log('Cryptocurrency data initialized');
+          isInitialized = true;
+        }
+      } else if (data === null) {
+        console.log('API rate limited or failed - keeping existing data');
       }
     } catch (error) {
       console.error('Error in periodic update:', error);
@@ -164,8 +174,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initial data fetch
   initializeAndUpdate().catch(err => console.error("Initial fetch failed:", err));
 
-  // Set up periodic updates every 30 seconds
-  setInterval(initializeAndUpdate, 30000);
+  // Set up periodic updates every 5 minutes to avoid rate limits
+  setInterval(initializeAndUpdate, 300000);
 
   // API Routes
   app.get("/api/cryptocurrencies", async (req, res) => {
