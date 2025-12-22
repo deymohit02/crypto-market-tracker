@@ -5,6 +5,14 @@ import type { Cryptocurrency, Watchlist, PriceAlert, PriceHistory } from "@share
 export function useCryptoData(limit?: number) {
   return useQuery<Cryptocurrency[]>({
     queryKey: ['/api/cryptocurrencies', limit],
+    queryFn: async () => {
+      const url = limit
+        ? `/api/cryptocurrencies?limit=${limit}`
+        : '/api/cryptocurrencies';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch cryptocurrencies');
+      return res.json();
+    },
     staleTime: 30000, // Data is fresh for 30 seconds
   });
 }

@@ -12,7 +12,7 @@ import { Plus } from "lucide-react";
 export default function Dashboard() {
   const [selectedCrypto, setSelectedCrypto] = useState("bitcoin");
   const [searchFilter, setSearchFilter] = useState<string | null>(null);
-  const { data: cryptocurrencies, isLoading } = useCryptoData();
+  const { data: cryptocurrencies, isLoading } = useCryptoData(100);
   const { data: priceHistory } = usePriceHistory(selectedCrypto, 24);
   const { isConnected } = useWebSocket();
 
@@ -23,7 +23,7 @@ export default function Dashboard() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Market Overview */}
-        <MarketOverview cryptocurrencies={cryptocurrencies?.slice(0, 4) || []} />
+        <MarketOverview cryptocurrencies={cryptocurrencies || []} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Dashboard */}

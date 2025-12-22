@@ -1,8 +1,10 @@
 // MarketOverview component for displaying crypto trends
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Cryptocurrency } from "@shared/schema";
+import { useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/useCryptoData";
 
 interface MarketOverviewProps {
     cryptocurrencies: Cryptocurrency[];
@@ -11,11 +13,28 @@ interface MarketOverviewProps {
 export default function MarketOverview({ cryptocurrencies: initialCryptos }: MarketOverviewProps) {
     const [displayedCoins, setDisplayedCoins] = useState<Cryptocurrency[]>(initialCryptos.slice(0, 4));
     const [startIndex, setStartIndex] = useState(0);
+    const { data: watchlist } = useWatchlist();
+    const addToWatchlist = useAddToWatchlist();
+    const removeFromWatchlist = useRemoveFromWatchlist();
 
-    // Rotate through different coins every minute
+    const toggleWatchlist = (e: React.MouseEvent, cryptoId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const isInWatchlist = watchlist?.some(item => item.cryptoId === cryptoId);
+        if (isInWatchlist) {
+            removeFromWatchlist.mutate(cryptoId);
+        } else {
+            addToWatchlist.mutate({ cryptoId });
+        }
+    };
+
+    // Rotate through different coins every 30 seconds
     useEffect(() => {
+        // Immediate update when data arrives or changes
+        setDisplayedCoins(initialCryptos.slice(startIndex, startIndex + 4));
+
         if (initialCryptos.length <= 4) {
-            setDisplayedCoins(initialCryptos);
             return;
         }
 
@@ -29,7 +48,7 @@ export default function MarketOverview({ cryptocurrencies: initialCryptos }: Mar
                 setDisplayedCoins(nextCoins);
                 return nextIndex;
             });
-        }, 60000); // Change every minute
+        }, 30000); // Change every 30 seconds
 
         return () => clearInterval(interval);
     }, [initialCryptos]);
@@ -67,6 +86,16 @@ export default function MarketOverview({ cryptocurrencies: initialCryptos }: Mar
                                         <p className="text-xs text-muted-foreground">{crypto.symbol.toUpperCase()}</p>
                                     </div>
                                 </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-yellow-500"
+                                    onClick={(e) => toggleWatchlist(e, crypto.id)}
+                                >
+                                    <Star
+                                        className={`h-4 w-4 ${watchlist?.some(item => item.cryptoId === crypto.id) ? "fill-yellow-500 text-yellow-500" : ""}`}
+                                    />
+                                </Button>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-2xl font-bold">{formatPrice(crypto.current_price)}</p>

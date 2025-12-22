@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 Chart.register(...registerables);
 
-type TimeFilter = '1h' | '3h' | '6h' | '24h' | '3d' | '7d' | '1m' | '3m' | 'all';
+type TimeFilter = '1h' | '3h' | '6h' | '24h' | '3d' | '7d' | '1m' | '3m' | '1y' | 'all';
 
 const TIME_FILTER_HOURS: Record<TimeFilter, number> = {
   '1h': 1,
@@ -17,7 +17,8 @@ const TIME_FILTER_HOURS: Record<TimeFilter, number> = {
   '7d': 168,
   '1m': 720,
   '3m': 2160,
-  'all': 8760, // 1 year
+  '1y': 8760,
+  'all': 43800, // 5 years approx, effectively "max" for most coins
 };
 
 interface PriceChartProps {
@@ -30,7 +31,8 @@ function formatTimeLabel(date: Date, timeFilter: TimeFilter): string {
     case '1h':
     case '3h':
     case '6h':
-      // For short periods, show time only (e.g., "2:30 PM")
+      // For short periods, show time only (e.g., "02:30:00") to distinguish points
+      // Using H:M:S if needed or H:M for 1h to avoid duplicate labels
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     case '24h':
@@ -47,8 +49,9 @@ function formatTimeLabel(date: Date, timeFilter: TimeFilter): string {
       // For months, show month/day (e.g., "Dec 20")
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
+    case '1y':
     case 'all':
-      // For all time, show month/year (e.g., "Dec 2024")
+      // For year/all, show month/year (e.g., "Dec 2024")
       return date.toLocaleDateString([], { month: 'short', year: 'numeric' });
 
     default:
@@ -236,18 +239,22 @@ export default function PriceChart({ cryptoId }: PriceChartProps) {
     );
   }
 
+  // More robust check for empty data
   if (!priceHistory || priceHistory.length === 0) {
+    // If 1h filter is selected but no data, it might be that the data hasn't been fetched yet/api lag
+    // Show a loading state or a specific message instead of just "No price history" immediately if it might be transient
+    // For now, let's just make the message friendlier
     return (
-      <div className="chart-container flex items-center justify-center" style={{ height: '400px' }}>
-        <div className="text-center text-muted-foreground">
-          <p>No price history available</p>
-          <p className="text-sm">Price data will appear here once available</p>
+      <div className="chart-container flex items-center justify-center border rounded-lg bg-card/50" style={{ height: '400px' }}>
+        <div className="text-center text-muted-foreground p-6">
+          <p className="text-lg font-semibold mb-2">No data available for this timeframe</p>
+          <p className="text-sm">Try selecting a different time range or wait for new data.</p>
         </div>
       </div>
     );
   }
 
-  const timeFilters: TimeFilter[] = ['1h', '3h', '6h', '24h', '3d', '7d', '1m', '3m', 'all'];
+  const timeFilters: TimeFilter[] = ['1h', '3h', '6h', '24h', '3d', '7d', '1m', '3m', '1y', 'all'];
 
   return (
     <div className="chart-container" data-testid="chart-price-history">
