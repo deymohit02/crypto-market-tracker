@@ -1,5 +1,5 @@
 
-async function check(hours) {
+async function check(hours: number) {
     const res = await fetch(`http://localhost:5000/api/cryptocurrencies/bitcoin/history?hours=${hours}`);
     const data = await res.json();
     if (!Array.isArray(data)) {
