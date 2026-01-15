@@ -36,7 +36,16 @@ export function useCryptoSearch(query: string, enabled: boolean = true) {
 
 export function usePriceHistory(cryptoId: string, hours: number = 24) {
   return useQuery<PriceHistory[]>({
-    queryKey: [`/api/cryptocurrencies/${cryptoId}/history?hours=${hours}`],
+    queryKey: [`/api/cryptocurrencies/${cryptoId}/history`, hours],
+    queryFn: async () => {
+      const res = await fetch(`/api/cryptocurrencies/${cryptoId}/history?hours=${hours}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch price history: ${res.statusText}`);
+      }
+      return await res.json();
+    },
     staleTime: 60000, // Price history is fresh for 1 minute
   });
 }

@@ -335,7 +335,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const start = now - (hours * 60 * 60 * 1000);
           const step = (now - start) / numPoints;
 
-          const basePrice = 50000;
+          // Get the actual current price from storage for this cryptocurrency
+          let basePrice = 50000; // Default fallback
+          const crypto = await storage.getCryptocurrency(id);
+          if (crypto && crypto.current_price) {
+            basePrice = parseFloat(crypto.current_price);
+          } else {
+            // Use reasonable defaults based on common coin IDs if not in storage
+            const priceDefaults: Record<string, number> = {
+              'bitcoin': 50000,
+              'ethereum': 3000,
+              'binancecoin': 400,
+              'solana': 100,
+              'cardano': 0.5,
+              'dogecoin': 0.1,
+              'xrp': 0.6,
+              'tether': 1,
+              'usd-coin': 1,
+            };
+            basePrice = priceDefaults[id] || 100;
+          }
 
           history = Array.from({ length: numPoints }, (_, i) => {
             const time = start + (i * step);
