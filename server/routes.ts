@@ -10,30 +10,67 @@ const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
 
 // Seed data for when CoinGecko is unavailable
 const SEED_CRYPTOS = [
-  { id: "bitcoin", symbol: "btc", name: "Bitcoin", rank: 1 },
-  { id: "ethereum", symbol: "eth", name: "Ethereum", rank: 2 },
-  { id: "tether", symbol: "usdt", name: "Tether", rank: 3 },
-  { id: "binancecoin", symbol: "bnb", name: "BNB", rank: 4 },
-  { id: "solana", symbol: "sol", name: "Solana", rank: 5 },
-  { id: "usd-coin", symbol: "usdc", name: "USDC", rank: 6 },
-  { id: "xrp", symbol: "xrp", name: "XRP", rank: 7 },
-  { id: "cardano", symbol: "ada", name: "Cardano", rank: 8 },
-  { id: "dogecoin", symbol: "doge", name: "Dogecoin", rank: 9 },
-  { id: "tron", symbol: "trx", name: "TRON", rank: 10 },
+  { id: "bitcoin", symbol: "btc", name: "Bitcoin", rank: 1, imageId: 1 },
+  { id: "ethereum", symbol: "eth", name: "Ethereum", rank: 2, imageId: 1027 },
+  { id: "tether", symbol: "usdt", name: "Tether", rank: 3, imageId: 325 },
+  { id: "binancecoin", symbol: "bnb", name: "BNB", rank: 4, imageId: 825 },
+  { id: "solana", symbol: "sol", name: "Solana", rank: 5, imageId: 4128 },
+  { id: "usd-coin", symbol: "usdc", name: "USDC", rank: 6, imageId: 6319 },
+  { id: "xrp", symbol: "xrp", name: "XRP", rank: 7, imageId: 52 },
+  { id: "cardano", symbol: "ada", name: "Cardano", rank: 8, imageId: 2010 },
+  { id: "dogecoin", symbol: "doge", name: "Dogecoin", rank: 9, imageId: 5 },
+  { id: "tron", symbol: "trx", name: "TRON", rank: 10, imageId: 1094 },
 ];
 
-async function fetchFromCoinGecko(endpoint: string) {
-  try {
-    const response = await fetch(`${COINGECKO_API_BASE}${endpoint}`);
-    if (!response.ok) {
-      // Just throw, catch block will handle
+// Realistic prices for fallback mode
+const REALISTIC_PRICES: Record<string, number> = {
+  'bitcoin': 47690,
+  'ethereum': 2580,
+  'tether': 1.00,
+  'binancecoin': 315,
+  'solana': 102,
+  'usd-coin': 1.00,
+  'xrp': 0.62,
+  'cardano': 0.52,
+  'dogecoin': 0.082,
+  'tron': 0.14,
+};
+
+async function fetchFromCoinGecko(endpoint: string, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(`${COINGECKO_API_BASE}${endpoint}`);
+
+      if (response.ok) {
+        return await response.json();
+      }
+
+      // Handle rate limiting specifically
+      if (response.status === 429) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+        console.log(`⚠️ Rate limited by CoinGecko (attempt ${attempt + 1}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // For other errors, throw immediately
       throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+    } catch (error) {
+      // If this was the last attempt, throw the error
+      if (attempt === retries - 1) {
+        console.error('❌ CoinGecko API error after all retries:', error);
+        throw error;
+      }
+
+      // Otherwise, wait and retry
+      const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+      console.log(`⚠️ API request failed (attempt ${attempt + 1}/${retries}), retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    return await response.json();
-  } catch (error) {
-    console.error('CoinGecko API error:', error);
-    throw error;
   }
+
+  // This should never be reached, but TypeScript needs it
+  throw new Error('Unexpected error in fetchFromCoinGecko');
 }
 
 async function updateCryptocurrencyData() {
@@ -77,18 +114,20 @@ async function updateCryptocurrencyData() {
           price: coin.current_price?.toString()
         });
       }
-      console.log(`Successfully updated ${data.length} cryptocurrencies`);
+      console.log(`✅ Successfully fetched and updated ${data.length} cryptocurrencies from CoinGecko`);
     }
 
     return data;
   } catch (error) {
-    console.error('Error updating cryptocurrency data (will retry later):', error);
+    console.error('⚠️ Error updating cryptocurrency data (will use fallback/cached data):', error);
 
     // If storage is empty (first boot), seed with basic data
     const existingData = await storage.getCryptocurrencies(10);
     if (!existingData || existingData.length === 0) {
-      console.log('Storage empty - seeding with fallback data');
+      console.log('📦 Storage empty - seeding with fallback data');
       await seedFallbackData();
+    } else {
+      console.log(`ℹ️ Using cached data (${existingData.length} coins) until API is available`);
     }
 
     // Return null to signal failure without clearing existing data
@@ -98,15 +137,15 @@ async function updateCryptocurrencyData() {
 
 async function seedFallbackData() {
   for (const seed of SEED_CRYPTOS) {
-    const basePrice = seed.rank === 1 ? 50000 : seed.rank === 2 ? 3000 : 500 / seed.rank;
-    const currentPrice = basePrice * (0.95 + Math.random() * 0.1); // ±5% variation
+    // Use realistic prices instead of random calculations
+    const currentPrice = REALISTIC_PRICES[seed.id] || 100;
     const change24h = -5 + Math.random() * 10; // -5% to +5%
 
     await storage.upsertCryptocurrency({
       id: seed.id,
       symbol: seed.symbol,
       name: seed.name,
-      image: `https://assets.coingecko.com/coins/images/1/${seed.id}.png`,
+      image: `https://assets.coingecko.com/coins/images/${seed.imageId}/small/${seed.id}.png`,
       current_price: currentPrice.toFixed(2),
       market_cap: (currentPrice * 1000000000).toFixed(0),
       market_cap_rank: seed.rank.toString(),
@@ -136,7 +175,7 @@ async function seedFallbackData() {
       price: currentPrice.toFixed(2)
     });
   }
-  console.log(`Seeded ${SEED_CRYPTOS.length} fallback cryptocurrencies`);
+  console.log(`Seeded ${SEED_CRYPTOS.length} fallback cryptocurrencies with realistic prices`);
 }
 
 async function checkPriceAlerts(cryptoData: any[]) {
